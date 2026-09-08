@@ -483,7 +483,12 @@ export function App(): JSX.Element {
       });
 
       let audioSrc = "";
-      if (ttsRes.audioBase64) {
+      // "mock" audio is a 44-byte silent WAV — the server has no SARVAM_API_KEY.
+      // Playing it would "succeed" with zero sound and a misleading "Spoken"
+      // toast, so treat it as no-audio and say why.
+      const isMockAudio = ttsRes.provider === "mock";
+
+      if (ttsRes.audioBase64 && !isMockAudio) {
         audioSrc = `data:${ttsRes.mimeType || "audio/wav"};base64,${ttsRes.audioBase64}`;
         const audio = new Audio(audioSrc);
         audioRef.current = audio;
@@ -496,21 +501,32 @@ export function App(): JSX.Element {
             setSpeaking(false);
           }
         };
+        let playBlocked = false;
         await audio.play().catch((playErr) => {
+          playBlocked = true;
           console.warn("[TTS] browser audio play blocked or unsupported:", playErr);
           audioRef.current = null;
           dispatch({ type: "SPEECH_DONE" });
           setSpeaking(false);
         });
+        if (playBlocked) {
+          flashNotification('🔇 Your browser blocked audio playback — tap "Say again".', 7000);
+        }
       } else {
         dispatch({ type: "SPEECH_DONE" });
         setSpeaking(false);
+        flashNotification(
+          isMockAudio
+            ? "🔇 No voice audio: the server is in mock mode (no SARVAM_API_KEY set). Check /health."
+            : "🔇 The voice service returned no audio for that message.",
+          9000,
+        );
       }
 
       const prov = await provPromise.catch(() => undefined);
       lastAudioRef.current = { src: audioSrc, text: textToSpeak, provenanceId: prov?.id };
       recordUsage(ctx.selectedConcepts); // F-10: powers the "Frequent" section
-      flashNotification(`📢 Spoken: "${textToSpeak}"`);
+      if (audioSrc) flashNotification(`📢 Spoken: "${textToSpeak}"`);
 
       // Trust Ladder: register this use, keyed on the STABLE interpretation text
       // (not the emotion-coloured sentence) so full -> fast promotion still works

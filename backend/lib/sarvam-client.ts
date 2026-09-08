@@ -199,10 +199,24 @@ export class RealSarvamClient implements SarvamClient {
       throw new Error(`Sarvam TTS REST API error (${response.status}): ${errText}`);
     }
 
-    const data = (await response.json()) as { audios?: string[] };
-    const audioBase64 = data.audios?.[0];
+    // Sarvam's REST response has historically been { audios: ["<base64>"] };
+    // accept a couple of near-variants defensively so a shape tweak surfaces as
+    // real audio, not a silent failure.
+    const data = (await response.json()) as {
+      audios?: unknown;
+      audio?: unknown;
+      output?: { audios?: unknown };
+    };
+    const fromArray = (v: unknown): string | undefined =>
+      Array.isArray(v) && typeof v[0] === "string" && v[0].length > 0 ? v[0] : undefined;
+    const audioBase64 =
+      fromArray(data.audios) ??
+      fromArray(data.output?.audios) ??
+      (typeof data.audio === "string" && data.audio.length > 0 ? data.audio : undefined);
     if (!audioBase64) {
-      throw new Error("Sarvam TTS returned no audio data in response.");
+      throw new Error(
+        `Sarvam TTS returned no audio. Response keys: [${Object.keys(data).join(", ") || "none"}].`,
+      );
     }
 
     return {
