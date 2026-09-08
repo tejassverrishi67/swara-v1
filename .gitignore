@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local secrets — never commit. See .env.example for the shape.
+.env
+.env.local
+
+# Default local provenance store location (see backend/lib/provenance.ts).
+data/

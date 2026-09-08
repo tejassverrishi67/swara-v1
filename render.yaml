@@ -1,0 +1,63 @@
+# Render Blueprint for the SWARA backend.
+# Dashboard -> New + -> Blueprint -> pick this repo.
+# Assumes the git repo root IS the `swara/` folder. If you version the outer
+# folder instead, change `rootDir` to `swara` and prefix `disk.mountPath` with
+# `swara/` (-> /opt/render/project/src/swara/backend/data).
+#
+# Delete this file if you prefer to configure the Web Service by hand.
+
+services:
+  - type: web
+    name: swara-api
+    runtime: node
+    plan: starter            # "free" sleeps after 15 min idle (cold starts)
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # --- required ---
+      - key: HOST
+        value: 0.0.0.0        # Render only routes to a process bound to 0.0.0.0
+      - key: NODE_VERSION
+        value: "20"
+      - key: SESSION_SECRET
+        generateValue: true   # Render generates a strong random value
+      - key: CORS_ORIGINS
+        sync: false           # set to your https://<app>.vercel.app on apply
+      # PORT is injected by Render automatically — do not set it.
+
+      # --- optional: real LLM (blank => deterministic mock) ---
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
+
+      # --- optional: real Sarvam TTS (blank => silent WAV) ---
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: SARVAM_MODEL
+        value: v2             # keep in sync with the frontend default speaker
+
+      # --- provenance / trust-ladder storage (persisted on the disk below) ---
+      - key: PROVENANCE_BACKEND
+        value: file
+      - key: PROVENANCE_FILE_PATH
+        value: ./data/provenance.jsonl
+      - key: PROVENANCE_RETENTION_DAYS
+        value: "90"
+
+      # --- rate limits for the paid endpoints ---
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: RATE_LIMIT_BURST
+        value: "20"
+    disk:
+      name: swara-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1

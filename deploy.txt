@@ -1,0 +1,246 @@
+==============================================================================
+SWARA — DEPLOYMENT GUIDE  (frontend on Vercel, backend on Render)
+==============================================================================
+
+This repo is an npm-workspaces monorepo:
+
+  swara/
+    package.json        workspace root (scripts: build, start, test, typecheck)
+    shared/             TypeScript types only, no runtime code, no build step
+    backend/            Express API, run directly with tsx (no compile step)
+    frontend/           React + Vite single-page app  ->  builds to frontend/dist
+
+Split deploy:
+  - Vercel  serves the static SPA in  frontend/dist
+  - Render  runs the backend Web Service (npm start -> tsx server.ts)
+  - The two are wired together by:
+        VITE_API_BASE  (frontend build -> which backend origin to call)
+        CORS_ORIGINS   (backend        -> which frontend origin(s) to allow)
+
+These notes assume the git repository root IS the `swara/` folder.
+If instead you version the whole outer folder (Swara/, with SPEC.md etc.),
+then on BOTH platforms set "Root Directory" = swara, and prefix the Render
+disk mount path below with  swara/ .
+
+Requirements: Node >= 20 (the backend uses process.loadEnvFile; Node 20.12+).
+
+
+==============================================================================
+0.  ONE-TIME: put the code on GitHub/GitLab
+==============================================================================
+
+  cd swara
+  git init
+  git add .
+  git commit -m "SWARA"
+  git branch -M main
+  git remote add origin <your-repo-url>
+  git push -u origin main
+
+Note: .env and .env.local are git-ignored (secrets). .env.example and
+.env.production ARE committed and are safe to edit — they hold no secrets.
+
+
+==============================================================================
+1.  BACKEND  ->  RENDER   (do this first; you need its URL for step 2)
+==============================================================================
+
+Render dashboard -> New + -> Web Service -> connect the repo.
+
+  Settings
+  --------
+  Name                 swara-api            (any name)
+  Root Directory       (leave blank)        [= swara if outer folder is the repo]
+  Runtime / Language   Node
+  Build Command        npm install
+  Start Command        npm start
+  Health Check Path    /health
+  Instance Type        Starter or higher (the Free type sleeps after 15 min
+                       idle -> ~50 s cold start on the next request; not great
+                       for an AAC user mid-sentence).
+
+  Environment variables  (Environment tab)
+  ----------------------------------------
+  REQUIRED
+    HOST            0.0.0.0
+        Render only routes traffic to a process bound to 0.0.0.0. The backend
+        default is 127.0.0.1, which Render cannot reach.
+
+    SESSION_SECRET  <64+ random hex chars>
+        The server REFUSES to start on a non-loopback HOST without this
+        (Features.md F-05 — one shared Trust Ladder for everyone is unsafe).
+        Generate one:
+            node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+        or:  openssl rand -hex 48
+
+    CORS_ORIGINS    https://<your-app>.vercel.app
+        Comma-separate multiple origins (add your custom domain once you have
+        one). Fill this in AFTER step 2 when you know the Vercel URL, then let
+        Render redeploy. Empty = "localhost dev only"; "*" works but is logged
+        as unsafe — don't ship it.
+        Vercel PREVIEW deployments get random URLs, so they will NOT be allowed
+        by a fixed list. Point previews at a separate backend if you need them.
+
+    NODE_VERSION    20            (pin it; 22 also fine)
+
+  DO NOT SET
+    PORT            Render injects it automatically; the backend reads it.
+
+  OPTIONAL — real AI/voice (leave blank = deterministic mock data + silent WAV)
+    LLM_PROVIDER    openai | anthropic | groq | openrouter | ...
+    LLM_API_KEY     <key for that provider>
+    LLM_MODEL       (optional override; defaults: openai->gpt-4o-mini,
+                     anthropic->claude-3-5-sonnet-20241022)
+    OPENAI_BASE_URL required for any OpenAI-COMPATIBLE provider that is not
+                     OpenAI itself, e.g.
+                       Groq:       https://api.groq.com/openai/v1
+                       OpenRouter: https://openrouter.ai/api/v1
+    SARVAM_API_KEY  <Sarvam Bulbul TTS key>
+    SARVAM_MODEL    v2 | v3         (default v2)
+        Speaker and model are coupled — a v2 speaker 400s on a v3 model and
+        vice-versa. The frontend's default speaker is set in
+        swara/frontend/src/App.tsx (currently "priya", a v3 voice). If you set
+        SARVAM_MODEL=v2, either change that default to "anushka"/"abhilash" or
+        set SARVAM_DEFAULT_SPEAKER to a v2 voice. See swara/.env.example.
+
+  OPTIONAL — tuning
+    RATE_LIMIT_PER_MINUTE   60      per-IP + per-device budget for the paid
+    RATE_LIMIT_BURST        20      endpoints (interpret / generate / tts).
+                                    Be generous — AAC users send many short
+                                    messages under stress.
+    PROVENANCE_RETENTION_DAYS  90   audit records carry medical-symptom text;
+    PROVENANCE_REDACT          true store structure but not the transcript.
+
+  Persistent storage  (STRONGLY recommended)
+  ------------------------------------------
+  Render's disk is wiped on every deploy and restart. The backend writes two
+  files under  <backend-cwd>/data/ :
+      data/provenance.jsonl     the audit trail (Features.md F-06)
+      data/trust-ladder.json    learned "fast"/"instant" promotions per device
+
+  Add a Disk (service -> Disks -> Add Disk):
+      Name         swara-data
+      Mount Path   /opt/render/project/src/backend/data
+                   [ = /opt/render/project/src/swara/backend/data
+                       if the outer folder is the repo ]
+      Size         1 GB
+
+  Keep PROVENANCE_BACKEND at its default ("file") and PROVENANCE_FILE_PATH at
+  its default ("./data/provenance.jsonl"); both files then land on the disk.
+  Render disks are encrypted at rest.
+
+  Quick demo without a disk: set  PROVENANCE_BACKEND=memory  — but the audit
+  trail and all Trust Ladder learning are lost on every restart.
+
+  Verify
+  ------
+  After the first deploy:  https://<your-api>.onrender.com/health
+  Expect: {"ok":true,"llm":"mock"|"openai"...,"tts":"mock"|"sarvam",...}
+
+
+==============================================================================
+2.  FRONTEND  ->  VERCEL
+==============================================================================
+
+First, point the production build at the Render backend. Edit the committed
+file  swara/.env.production  :
+
+    VITE_API_BASE=https://<your-api>.onrender.com
+    VITE_APP_VERSION=1.0.0
+
+(The default in that file is empty, which means "call my own origin" — correct
+for the single-process local deploy, wrong for a split Vercel/Render deploy.)
+Commit and push. No trailing slash needed (the client trims it).
+
+Vercel dashboard -> Add New -> Project -> import the repo.
+
+  Settings
+  --------
+  Root Directory        (leave as ./)     [= swara if outer folder is the repo]
+  Framework Preset      Vite
+  Build Command         npm run build
+  Output Directory      frontend/dist
+  Install Command       npm install
+
+  Keeping the workspace root as the Root Directory matters: the frontend
+  imports @swara/shared, which Vite resolves to ../shared/types.ts. Building
+  from inside frontend/ alone would break that path.
+
+  Environment Variables (optional — only if you did NOT edit .env.production)
+  -------------------------------------------------------------------------
+    VITE_API_BASE      https://<your-api>.onrender.com
+    VITE_APP_VERSION   1.0.0
+  These are read at BUILD time. Add them before the first build, or redeploy
+  after adding. (Editing .env.production and committing is the simpler path and
+  keeps the value in version control where it is not a secret.)
+
+There is a swara/vercel.json in this repo that already sets the build command,
+output directory, and an SPA fallback rewrite — Vercel picks it up
+automatically when Root Directory is the repo root.
+
+  Verify
+  ------
+  Open the Vercel URL. The concept tiles should load (they come from
+  GET /api/palettes on the Render backend; a bundled fallback board shows even
+  if that call fails). Check the browser devtools Network tab: the /api/*
+  requests must go to your onrender.com origin and return 200, not CORS errors.
+
+
+==============================================================================
+3.  WIRE THE TWO TOGETHER  (order matters)
+==============================================================================
+
+  1. Deploy backend to Render.                  -> note  https://xxx.onrender.com
+  2. Set VITE_API_BASE to that URL (edit swara/.env.production, push) and
+     deploy the frontend to Vercel.             -> note  https://yyy.vercel.app
+  3. Set  CORS_ORIGINS = https://yyy.vercel.app  on Render. Render redeploys.
+  4. Add a custom domain? Add it to CORS_ORIGINS (comma-separated) and redeploy
+     the backend, and re-run the frontend build if the API origin changed.
+  5. End-to-end test: pick tiles -> "Suggest tones" -> pick a tone -> it speaks
+     (silent WAV in mock mode; real audio once SARVAM_API_KEY is set).
+
+
+==============================================================================
+4.  OPTIONAL — Render Blueprint (infra as code)
+==============================================================================
+
+swara/render.yaml in this repo describes the Web Service + disk. To use it:
+Render dashboard -> New + -> Blueprint -> pick the repo. It still prompts you
+for the secret/marked env vars (SESSION_SECRET, API keys, CORS_ORIGINS).
+Delete render.yaml if you prefer to configure the service by hand.
+
+
+==============================================================================
+5.  TROUBLESHOOTING
+==============================================================================
+
+Backend log: "REFUSING TO START ... HOST is 0.0.0.0 ... SESSION_SECRET is empty"
+    -> set SESSION_SECRET on Render.
+
+Backend log: "REFUSING TO START ... v2 speaker on a v3 model" (or vice-versa)
+    -> align SARVAM_MODEL with SARVAM_DEFAULT_SPEAKER / the frontend default
+       speaker in App.tsx. See swara/.env.example.
+
+Frontend loads but every /api call fails with a CORS error
+    -> CORS_ORIGINS on Render does not exactly match the browser's origin
+       (scheme + host, no trailing slash, no path). Fix and redeploy backend.
+
+Frontend calls http://localhost:8787 in production
+    -> VITE_API_BASE was not set at build time. Edit swara/.env.production (or
+       add the Vercel env var) and redeploy the frontend.
+
+Tiles/history reset after every backend deploy
+    -> add the Render Disk (section 1). Without it the data/ dir is ephemeral.
+
+Render build fails: "tsx: not found" / "vite: not found"
+    -> something forced a production-only install. Ensure devDependencies are
+       installed (Render does this by default; do NOT set NPM_CONFIG_PRODUCTION
+       or --omit=dev).
+
+Free Render instance is slow on the first request after idle
+    -> that is the cold start. Upgrade the instance type, or ping /health on a
+       schedule to keep it warm.
+
+502 from Render right after deploy
+    -> the process is not binding 0.0.0.0:$PORT. Confirm HOST=0.0.0.0 and that
+       PORT is NOT overridden in your env vars.

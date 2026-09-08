@@ -1,0 +1,15 @@
+/**
+ * Frontend entrypoint. Nothing interesting here — see App.tsx for the flow and
+ * README.md for what this skeleton does and does not include.
+ */
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./App.tsx";
+
+const container = document.getElementById("root");
+if (!container) throw new Error("#root not found");
+createRoot(container).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);

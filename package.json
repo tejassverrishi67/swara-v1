@@ -1,0 +1,23 @@
+{
+  "name": "swara",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SWARA — AI-assisted AAC: concepts -> confirmed meaning -> context-appropriate expression -> speech. This package is the workspace root; see README.md and ../SPEC.md.",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "test": "npm run test --workspace backend && npm run test --workspace frontend",
+    "typecheck": "npm run typecheck --workspace shared && npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "start": "npm run start --workspace backend"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

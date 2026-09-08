@@ -1,0 +1,735 @@
+/* ==========================================================================
+   SWARA — Premium Glassmorphism Theme
+   Tailwind v4 entry + MagicUI animation tokens + a glass re-skin of the
+   existing class-based design system in index.css.
+
+   Load order matters: this file is imported AFTER ./index.css in App.tsx, so
+   its unlayered rules win on equal specificity without needing !important.
+   Accessibility: every translucent/animated effect collapses to a solid,
+   static surface under [data-high-contrast], and freezes under
+   [data-reduce-motion] / prefers-reduced-motion.
+   ========================================================================== */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* MagicUI decorative animations (border-beam, shine-border, aurora-text,
+   shimmer-button) expect these utilities to exist. */
+@theme {
+  --animate-aurora: aurora 8s ease-in-out infinite alternate;
+  --animate-shine: shine var(--duration, 14s) infinite linear;
+  --animate-shimmer-slide: shimmer-slide var(--speed, 3s) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed, 3s) * 2) infinite linear;
+
+  @keyframes aurora {
+    0% {
+      background-position: 0% 50%;
+      transform: rotate(-5deg) scale(0.9);
+    }
+    25% {
+      background-position: 50% 100%;
+      transform: rotate(5deg) scale(1.1);
+    }
+    50% {
+      background-position: 100% 50%;
+      transform: rotate(-3deg) scale(0.95);
+    }
+    75% {
+      background-position: 50% 0%;
+      transform: rotate(3deg) scale(1.05);
+    }
+    100% {
+      background-position: 0% 50%;
+      transform: rotate(-5deg) scale(0.9);
+    }
+  }
+  @keyframes shine {
+    0% {
+      background-position: 0% 0%;
+    }
+    50% {
+      background-position: 100% 100%;
+    }
+    to {
+      background-position: 0% 0%;
+    }
+  }
+  @keyframes shimmer-slide {
+    to {
+      transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+    0% {
+      transform: translateZ(0) rotate(0);
+    }
+    15%,
+    35% {
+      transform: translateZ(0) rotate(90deg);
+    }
+    65%,
+    85% {
+      transform: translateZ(0) rotate(270deg);
+    }
+    100% {
+      transform: translateZ(0) rotate(360deg);
+    }
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Glass design tokens — layered on top of the index.css palette.
+ * ──────────────────────────────────────────────────────────────────────────── */
+:root {
+  --glass-blur: 18px;
+  --glass-blur-sm: 10px;
+
+  --glass-bg: rgba(23, 32, 54, 0.55);
+  --glass-bg-strong: rgba(18, 26, 45, 0.74);
+  --glass-bg-inset: rgba(7, 11, 20, 0.5);
+
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --glass-border-strong: rgba(255, 255, 255, 0.22);
+  --glass-highlight: rgba(255, 255, 255, 0.26);
+
+  --glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.03) 38%,
+    rgba(96, 165, 250, 0.14)
+  );
+
+  --glass-shadow: 0 10px 34px -10px rgba(0, 0, 0, 0.6), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --glass-shadow-lg: 0 26px 60px -14px rgba(0, 0, 0, 0.7), 0 4px 14px -4px rgba(0, 0, 0, 0.5);
+
+  --aurora-1: rgba(99, 102, 241, 0.45);
+  --aurora-2: rgba(45, 212, 191, 0.38);
+  --aurora-3: rgba(217, 70, 239, 0.3);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Ambient aurora backdrop — sits behind the app + the MagicUI <Particles>.
+ * ──────────────────────────────────────────────────────────────────────────── */
+body {
+  background-color: #05070d;
+  position: relative;
+}
+
+.app-aurora {
+  position: fixed;
+  inset: -25vmax;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+  filter: blur(90px) saturate(135%);
+}
+.app-aurora::before,
+.app-aurora::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(38vmax 38vmax at 18% 22%, var(--aurora-1), transparent 60%),
+    radial-gradient(34vmax 34vmax at 82% 18%, var(--aurora-2), transparent 62%),
+    radial-gradient(40vmax 40vmax at 62% 88%, var(--aurora-3), transparent 60%);
+  animation: aurora 22s ease-in-out infinite alternate;
+}
+.app-aurora::after {
+  animation-duration: 34s;
+  animation-direction: alternate-reverse;
+  opacity: 0.7;
+  mix-blend-mode: screen;
+}
+
+.app-particles {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Frosted panels — the primary glass surfaces.
+ * ──────────────────────────────────────────────────────────────────────────── */
+.step-nav,
+.audience-selector,
+.thought-tray,
+.emotion-picker,
+.interpretation-panel-section,
+.expression-picker-section,
+.speak-section,
+.spoken-bar,
+.speak-flash,
+.settings-panel,
+.frequent-strip {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Emphasis panels keep their accent ring + glow, just frosted. */
+.interpretation-panel-section,
+.speak-section {
+  border-color: color-mix(in srgb, var(--accent-indigo) 55%, var(--glass-border));
+  box-shadow: var(--glass-shadow-lg), 0 0 40px -10px rgba(99, 102, 241, 0.45),
+    inset 0 1px 0 var(--glass-highlight);
+}
+.speak-flash {
+  border-color: color-mix(in srgb, var(--accent-indigo) 60%, transparent);
+  box-shadow: var(--glass-shadow-lg), 0 0 44px -12px rgba(99, 102, 241, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+.speak-flash.is-speaking {
+  border-color: color-mix(in srgb, var(--accent-teal-bright) 60%, transparent);
+  box-shadow: var(--glass-shadow-lg), 0 0 44px -10px rgba(45, 212, 191, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+.spoken-bar {
+  border-color: color-mix(in srgb, var(--accent-emerald) 50%, var(--glass-border));
+}
+
+/* Modal: deeper frost + stronger lift. */
+.modal-dialog {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--accent-amber) 45%, var(--glass-border));
+  box-shadow: var(--glass-shadow-lg), 0 0 44px -12px rgba(245, 158, 11, 0.4);
+}
+.modal-backdrop {
+  background: rgba(3, 5, 12, 0.62);
+}
+
+/* Inset "quote" cards read as darker glass wells. */
+.meaning-display-card,
+.speak-preview-card,
+.staged-editor-box,
+.pinned-phrase-preview,
+.tray-chips {
+  background: var(--glass-bg-inset);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.meaning-display-card,
+.speak-preview-card {
+  border-left: 4px solid var(--accent-teal-bright);
+}
+.speak-preview-card {
+  border-left-color: var(--accent-indigo-bright);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Interactive cards & tiles — gradient hairline border + hover sheen.
+ * ──────────────────────────────────────────────────────────────────────────── */
+.concept-tile,
+.shortlist-card,
+.expression-card,
+.chip-button,
+.emotion-tag,
+.audience-input,
+.palette-search,
+.language-select,
+.staged-textarea {
+  background:
+    linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+    var(--glass-sheen) border-box;
+  border: 1px solid transparent;
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(140%);
+}
+
+.concept-tile {
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+/* Diagonal glare that sweeps across a tile on hover. */
+.concept-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+.concept-tile:hover::after {
+  transform: translateX(120%);
+}
+.concept-tile:hover {
+  background:
+    linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)) padding-box,
+    var(--glass-sheen) border-box;
+  box-shadow: var(--glass-shadow-lg), inset 0 1px 0 var(--glass-highlight);
+}
+.concept-tile.selected {
+  background:
+    linear-gradient(rgba(20, 184, 166, 0.24), rgba(20, 184, 166, 0.14)) padding-box,
+    linear-gradient(135deg, var(--accent-teal-bright), rgba(45, 212, 191, 0.2)) border-box;
+  box-shadow: 0 0 26px -4px rgba(45, 212, 191, 0.5), inset 0 1px 0 var(--glass-highlight);
+}
+
+.shortlist-card:hover,
+.expression-card:hover {
+  background:
+    linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)) padding-box,
+    var(--glass-sheen) border-box;
+}
+.expression-card.selected {
+  background:
+    linear-gradient(rgba(20, 184, 166, 0.16), rgba(20, 184, 166, 0.09)) padding-box,
+    linear-gradient(135deg, var(--accent-teal-bright), rgba(45, 212, 191, 0.25)) border-box;
+  box-shadow: 0 0 22px -6px rgba(45, 212, 191, 0.4);
+}
+.chip-button.active {
+  background:
+    linear-gradient(rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0.18)) padding-box,
+    linear-gradient(135deg, var(--accent-indigo-bright), rgba(129, 140, 248, 0.25)) border-box;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Buttons — frosted glass with a top highlight; primaries keep their gradient.
+ * ──────────────────────────────────────────────────────────────────────────── */
+.secondary-button,
+.tray-action-btn,
+.utility-button,
+.editor-revert-btn,
+.pin-instant-button,
+.modal-cancel-btn,
+.speak-flash-stop {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+.secondary-button:hover:not(:disabled),
+.tray-action-btn:hover,
+.utility-button:hover:not(:disabled) {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-highlight);
+}
+
+.primary-button,
+.primary-confirm-btn,
+.speak-primary-button,
+.fast-tap-confirm-btn,
+.modal-confirm-btn {
+  position: relative;
+  border: 1px solid var(--glass-highlight);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -12px 20px -12px rgba(0, 0, 0, 0.4);
+}
+.primary-button::before,
+.speak-primary-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 45%);
+  pointer-events: none;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Header / brand.
+ * ──────────────────────────────────────────────────────────────────────────── */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  background: linear-gradient(180deg, rgba(5, 7, 13, 0.72), rgba(5, 7, 13, 0.12));
+  border-bottom: 1px solid var(--glass-border);
+}
+.brand-title {
+  font-size: 1.95rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+/* Floating control cluster: theme toggle + add-tile, pinned top-right of the
+   viewport and clear of the sticky header. */
+.floating-controls {
+  position: fixed;
+  top: 4.85rem;
+  right: 0.9rem;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.floating-controls .secondary-button {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  text-align: center;
+  box-shadow: var(--glass-shadow);
+}
+@media (max-width: 900px) {
+  .floating-controls {
+    top: 4.25rem;
+  }
+}
+
+/* Counter / status pills pick up a faint frost. */
+.tray-counter-pill,
+.fast-pill,
+.confidence-chip,
+.emotion-badge,
+.preview-badge,
+.pinned-badge {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Banners: translucent tint over frost, semantic colour kept. */
+.notification-banner,
+.error-banner,
+.tier-badge-banner,
+.meaning-check-banner,
+.resume-banner {
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Light-mode leftovers in index.css (F-02 / F-08 / F-11 / F-13 sections use
+ * hard-coded #eef4ff / #fff7e6 / #f3f6fb) — bring them into the dark glass.
+ * ──────────────────────────────────────────────────────────────────────────── */
+.resume-banner {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(99, 102, 241, 0.08));
+  border: 1px solid color-mix(in srgb, var(--accent-indigo) 55%, var(--glass-border));
+}
+.resume-text {
+  color: var(--text-primary);
+}
+.degraded-note {
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fde68a;
+}
+.no-selection-hint {
+  background: var(--glass-bg-inset);
+  border: 1px dashed var(--glass-border-strong);
+  color: var(--text-secondary);
+}
+.say-again-button {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+  border: 2px solid color-mix(in srgb, var(--accent-indigo) 55%, var(--glass-border));
+  color: var(--text-primary);
+}
+.say-again-button:hover {
+  background: var(--glass-bg-strong);
+}
+.speech-cancelled-note,
+.resume-text strong {
+  color: var(--text-secondary);
+}
+.language-select {
+  color: var(--text-primary);
+}
+.language-select option {
+  color: #000;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * MagicUI helper positioning (BorderBeam / ShineBorder are absolutely
+ * positioned children — their host needs a clip + stacking context).
+ * ──────────────────────────────────────────────────────────────────────────── */
+.glass-beam-host {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * LIGHT MODE
+ * The whole app is authored dark-first on bare :root. `<html>` carries `.dark`
+ * by default (set pre-paint in index.html); the header toggle removes it.
+ * Everything downstream is token-driven, so `:root:not(.dark)` only has to
+ * restate the palette + glass tokens, plus a few hard-coded dark surfaces.
+ * ════════════════════════════════════════════════════════════════════════════ */
+:root:not(.dark) {
+  /* index.css design-system palette → light */
+  --bg-primary: #e6eaf6;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f4f6fb;
+  --bg-surface-highlight: #e7ebf3;
+  --bg-surface-glass: rgba(255, 255, 255, 0.8);
+
+  --border-subtle: #d3daea;
+  --border-strong: #a9b3cb;
+
+  --text-primary: #131a2e;
+  --text-secondary: #3a4560;
+  --text-muted: #647089;
+  --text-inverse: #ffffff;
+
+  --shadow-sm: 0 1px 2px rgba(24, 33, 66, 0.1);
+  --shadow-md: 0 8px 20px -6px rgba(24, 33, 66, 0.18);
+  --shadow-lg: 0 20px 44px -10px rgba(24, 33, 66, 0.26);
+
+  /* Glass tokens → real light frost: translucent white you can see THROUGH to
+     the coloured aurora, edged with a cool highlight and lifted by a two-part
+     shadow (tight contact + soft ambient). */
+  --glass-blur: 22px;
+  --glass-blur-sm: 14px;
+
+  --glass-bg: rgba(255, 255, 255, 0.5);
+  --glass-bg-strong: rgba(255, 255, 255, 0.72);
+  --glass-bg-inset: rgba(228, 233, 246, 0.62);
+
+  --glass-border: rgba(255, 255, 255, 0.9);
+  --glass-border-strong: rgba(255, 255, 255, 1);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+
+  /* Bluish edge so the hairline border catches light on a pale surface. */
+  --glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95),
+    rgba(148, 163, 255, 0.35) 42%,
+    rgba(99, 102, 241, 0.22)
+  );
+
+  --glass-shadow: 0 1px 2px rgba(24, 33, 66, 0.06), 0 14px 34px -12px rgba(31, 41, 84, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --glass-shadow-lg: 0 2px 6px rgba(24, 33, 66, 0.08), 0 34px 70px -18px rgba(31, 41, 84, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
+  /* Stronger, more saturated aurora — on a light ground it needs to actually
+     show up behind the frosted panels or the glass reads as flat white. */
+  --aurora-1: rgba(129, 140, 248, 0.6);
+  --aurora-2: rgba(45, 212, 191, 0.5);
+  --aurora-3: rgba(232, 121, 249, 0.42);
+}
+
+/* A soft coloured wash for the ground so frosted surfaces have something to
+   refract instead of white-on-white. Fixed so it doesn't scroll. */
+:root:not(.dark) body {
+  background:
+    radial-gradient(60vmax 50vmax at 12% -8%, #dfe4fb 0%, transparent 60%),
+    radial-gradient(55vmax 45vmax at 108% 4%, #d6eef4 0%, transparent 55%),
+    radial-gradient(70vmax 60vmax at 78% 112%, #efdcfb 0%, transparent 60%),
+    linear-gradient(165deg, #e8ebf8 0%, #e3e9f7 45%, #ece2f7 100%);
+  background-attachment: fixed;
+}
+:root:not(.dark) .app-aurora {
+  filter: blur(80px) saturate(140%);
+  opacity: 0.95;
+}
+:root:not(.dark) .app-header {
+  background: linear-gradient(180deg, rgba(248, 249, 254, 0.78), rgba(248, 249, 254, 0.28));
+  border-bottom-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 24px -14px rgba(31, 41, 84, 0.35);
+}
+
+/* Interactive cards / tiles / inputs in light mode: they use a sheen border-box
+   with no drop shadow in the base rule, which is invisible white-on-white.
+   Add the lift here. */
+:root:not(.dark) .concept-tile,
+:root:not(.dark) .shortlist-card,
+:root:not(.dark) .expression-card,
+:root:not(.dark) .emotion-tag,
+:root:not(.dark) .chip-button,
+:root:not(.dark) .audience-input,
+:root:not(.dark) .palette-search,
+:root:not(.dark) .language-select,
+:root:not(.dark) .staged-textarea {
+  box-shadow: 0 1px 2px rgba(24, 33, 66, 0.05), 0 10px 24px -14px rgba(31, 41, 84, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+:root:not(.dark) .concept-tile:hover,
+:root:not(.dark) .shortlist-card:hover,
+:root:not(.dark) .expression-card:hover {
+  box-shadow: 0 2px 6px rgba(24, 33, 66, 0.08), 0 20px 40px -16px rgba(31, 41, 84, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+:root:not(.dark) .concept-tile.selected {
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.5), 0 18px 40px -14px rgba(20, 184, 166, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Frosted status pills get a hairline + faint lift so they read on white. */
+:root:not(.dark) .tray-counter-pill,
+:root:not(.dark) .fast-pill,
+:root:not(.dark) .confidence-chip,
+:root:not(.dark) .emotion-badge,
+:root:not(.dark) .preview-badge,
+:root:not(.dark) .pinned-badge {
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 6px -2px rgba(31, 41, 84, 0.18);
+}
+
+/* Hard-coded dark wells / tints in index.css → light equivalents. */
+:root:not(.dark) .meaning-display-card,
+:root:not(.dark) .speak-preview-card,
+:root:not(.dark) .staged-editor-box,
+:root:not(.dark) .pinned-phrase-preview,
+:root:not(.dark) .tray-chips {
+  border-color: rgba(15, 23, 42, 0.06);
+  box-shadow: inset 0 1px 3px rgba(31, 41, 84, 0.1);
+}
+:root:not(.dark) .staged-textarea,
+:root:not(.dark) .audience-input {
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    var(--glass-sheen) border-box;
+}
+
+/* Banner text: the pale-on-dark tints in index.css need darkening on light. */
+:root:not(.dark) .notification-banner {
+  color: #065f46;
+}
+:root:not(.dark) .error-banner {
+  color: #9f1239;
+}
+:root:not(.dark) .tier-badge-banner.tier-full,
+:root:not(.dark) .checkpoint-title {
+  color: #3730a3;
+}
+:root:not(.dark) .tier-badge-banner.tier-fast {
+  color: #065f46;
+}
+:root:not(.dark) .tier-badge-banner.tier-instant {
+  color: #92400e;
+}
+:root:not(.dark) .degraded-note {
+  background: rgba(245, 158, 11, 0.16);
+  color: #92400e;
+}
+:root:not(.dark) .pill-index,
+:root:not(.dark) .card-confirm-prompt,
+:root:not(.dark) .checkpoint-title {
+  color: #4f46e5;
+}
+
+/* The header theme-toggle button (icon only). */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0.5rem;
+  color: var(--text-primary);
+}
+
+/* View-transition timing for the toggle reveal + reduced-motion opt-out. */
+::view-transition-group(root) {
+  animation-duration: var(--magicui-theme-toggle-vt-duration, 400ms);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:root[data-magicui-theme-vt="active"]::view-transition-new(root) {
+  clip-path: var(--magicui-theme-vt-clip-from);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+:root[data-reduce-motion]::view-transition-group(root),
+:root[data-reduce-motion]::view-transition-old(root),
+:root[data-reduce-motion]::view-transition-new(root) {
+  animation: none !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Accessibility overrides.
+ * High contrast: no translucency, no blur, no decorative motion layers.
+ * ──────────────────────────────────────────────────────────────────────────── */
+:root[data-high-contrast] {
+  --glass-blur: 0px;
+  --glass-blur-sm: 0px;
+  --glass-bg: #000000;
+  --glass-bg-strong: #000000;
+  --glass-bg-inset: #000000;
+  --glass-border: #ffffff;
+  --glass-border-strong: #ffffff;
+  --glass-highlight: transparent;
+  --glass-sheen: linear-gradient(#ffffff, #ffffff);
+  --glass-shadow: none;
+  --glass-shadow-lg: none;
+}
+:root[data-high-contrast] .app-aurora,
+:root[data-high-contrast] .app-particles,
+:root[data-high-contrast] .concept-tile::after,
+:root[data-high-contrast] .primary-button::before,
+:root[data-high-contrast] .speak-primary-button::before,
+:root[data-high-contrast] [data-glass-decor] {
+  display: none !important;
+}
+:root[data-high-contrast] body {
+  background-color: #000000;
+}
+:root[data-high-contrast] .app-header {
+  background: #000000;
+}
+/* Aurora wordmark → flat, high-contrast foreground colour. */
+:root[data-high-contrast] .brand-title [aria-hidden] {
+  background: none !important;
+  -webkit-text-fill-color: #ffffff !important;
+  color: #ffffff !important;
+  animation: none !important;
+}
+
+/* Light + high contrast: black-on-white instead of the dark HC white-on-black. */
+:root:not(.dark)[data-high-contrast] {
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-bg-inset: #ffffff;
+  --glass-border: #000000;
+  --glass-border-strong: #000000;
+  --border-subtle: #000000;
+  --border-strong: #000000;
+  --text-primary: #000000;
+  --text-secondary: #000000;
+  --text-muted: #1e293b;
+  --bg-primary: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-glass: #ffffff;
+}
+:root:not(.dark)[data-high-contrast] body,
+:root:not(.dark)[data-high-contrast] .app-header {
+  background: #ffffff;
+}
+:root:not(.dark)[data-high-contrast] .brand-title [aria-hidden] {
+  -webkit-text-fill-color: #000000 !important;
+  color: #000000 !important;
+}
+
+/* Reduced motion: freeze the ambient aurora + tile glare. JS-driven MagicUI
+   beams are gated in React (see App.tsx `decorEnabled`). */
+:root[data-reduce-motion] .app-aurora::before,
+:root[data-reduce-motion] .app-aurora::after,
+:root[data-reduce-motion] .concept-tile::after,
+:root[data-reduce-motion] .concept-tile:hover::after {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-aurora::before,
+  .app-aurora::after {
+    animation: none !important;
+  }
+  .concept-tile::after {
+    display: none;
+  }
+}

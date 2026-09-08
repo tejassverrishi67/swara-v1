@@ -1,0 +1,30 @@
+{
+  // Shared TypeScript settings for every workspace. Individual packages extend this
+  // and add their own `include` / `lib` / `jsx` as needed.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": [],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "sourceMap": true,
+
+    // `@swara/shared` resolves to the shared workspace without a build step.
+    "baseUrl": ".",
+    "paths": {
+      "@swara/shared": ["shared/types.ts"],
+      "@swara/shared/*": ["shared/*"]
+    }
+  }
+}

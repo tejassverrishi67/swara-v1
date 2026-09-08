@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SWARA</title>
+    <!-- Apply the saved theme before first paint so there is no light/dark flash.
+         SWARA defaults to dark; the header toggle (AnimatedThemeToggler) flips it. -->
+    <script>
+      try {
+        if ((localStorage.getItem("theme") || "dark") === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
+  </head>
+  <body>
+    <!-- The whole app mounts here. See src/main.tsx. -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
