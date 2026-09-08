@@ -132,9 +132,14 @@ export function App(): JSX.Element {
   /** F-08: an interrupted composition found in localStorage, offered back on load. */
   const [resumable, setResumable] = useState<PersistedSession | null>(null);
 
-  /** F-13 / F-14: languages + voices valid for the configured Bulbul model. */
+  /** F-13 / F-14: languages + voices valid for the configured Bulbul model,
+   *  plus the server's own defaults so a stale speaker can be snapped back. */
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [languages, setLanguages] = useState<LanguageInfo[]>([]);
+  const [catalogueDefaults, setCatalogueDefaults] = useState<{
+    speaker: string;
+    language: string;
+  } | null>(null);
 
   /** F-15: accessibility settings (persisted) + the switch-scanning / dwell engine. */
   const [settings, setSettings] = useState<A11ySettings>(() => loadSettings());
@@ -268,6 +273,7 @@ export function App(): JSX.Element {
         if (!active) return;
         setVoices(res.voices);
         setLanguages(res.languages);
+        setCatalogueDefaults({ speaker: res.defaultSpeaker, language: res.defaultLanguage });
         if (!res.voices.some((v) => v.id === ctx.speaker)) {
           dispatch({ type: "SET_SPEAKER", speaker: res.defaultSpeaker });
         }
@@ -281,6 +287,21 @@ export function App(): JSX.Element {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // F-14: the effect above only runs once on mount. A session restore (HYDRATE)
+  // or a slow catalogue fetch can leave `ctx.speaker` holding a value the
+  // configured Bulbul model rejects — e.g. a persisted v2 "anushka" against a v3
+  // backend — which then 400s at /api/tts mid-sentence. Re-reconcile whenever the
+  // catalogue or the current choice changes.
+  useEffect(() => {
+    if (!catalogueDefaults) return;
+    if (voices.length > 0 && !voices.some((v) => v.id === ctx.speaker)) {
+      dispatch({ type: "SET_SPEAKER", speaker: catalogueDefaults.speaker });
+    }
+    if (languages.length > 0 && !languages.some((l) => l.code === ctx.language)) {
+      dispatch({ type: "SET_LANGUAGE", language: catalogueDefaults.language });
+    }
+  }, [catalogueDefaults, voices, languages, ctx.speaker, ctx.language]);
 
   // F-10: load the concept tiles. Whatever boards the server returns are merged
   // into one unified pool (see `unifiedTiles`); there is no board to "select".
